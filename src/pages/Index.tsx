@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Camera, Keyboard, CheckCircle, Save, List, Package } from 'lucide-react';
+import { Camera, Keyboard, CheckCircle, Save, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -175,41 +175,40 @@ export default function Index() {
     <div className="min-h-screen bg-background flex flex-col">
       <LocationHeader location={location} onChange={setLocation} />
 
-      <main className="flex-1 px-safe py-6 space-y-6">
+      <main className="flex-1 px-safe py-3 space-y-3">
         {/* Step: Scan */}
         {step === 'scan' && (
-          <div className="space-y-5 animate-fade-in">
-            <div className="text-center mb-8">
-              <Package className="w-16 h-16 mx-auto text-primary mb-3" />
-              <h1 className="text-2xl font-bold text-foreground">
+          <div className="space-y-3 animate-fade-in">
+            <div className="text-center">
+              <h1 className="text-base font-bold text-foreground">
                 Captura de Artículo
               </h1>
-              <p className="text-muted-foreground mt-1">
+              <p className="text-muted-foreground text-sm">
                 Escanea o introduce el código
               </p>
             </div>
 
             <Button
               onClick={() => setScannerOpen(true)}
-              className="w-full h-20 text-xl font-bold bg-accent hover:bg-accent/90 text-accent-foreground animate-pulse-scale"
+              className="w-full h-16 text-lg font-bold bg-accent hover:bg-accent/90 text-accent-foreground animate-pulse-scale"
             >
-              <Camera className="w-7 h-7 mr-3" />
+              <Camera className="w-6 h-6 mr-2" />
               ESCANEAR
             </Button>
 
-            <div className="relative">
+            <div className="relative py-1">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center">
-                <span className="bg-background px-3 text-sm text-muted-foreground">
+                <span className="bg-background px-3 text-xs text-muted-foreground">
                   o introduce manualmente
                 </span>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="codigo-manual" className="text-sm font-medium">
+            <div className="space-y-1.5">
+              <Label htmlFor="codigo-manual" className="text-xs font-medium">
                 Código de artículo
               </Label>
               <div className="flex gap-2">
@@ -218,13 +217,13 @@ export default function Index() {
                   value={codigo}
                   onChange={(e) => setCodigo(e.target.value.toUpperCase())}
                   placeholder="EAN, SKU, QR..."
-                  className="h-14 text-lg font-mono flex-1"
+                  className="h-12 text-base font-mono flex-1"
                   onKeyDown={(e) => e.key === 'Enter' && handleManualEntry()}
                 />
                 <Button
                   onClick={handleManualEntry}
                   disabled={!codigo.trim()}
-                  className="h-14 px-5 bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                  className="h-12 px-4 bg-secondary text-secondary-foreground hover:bg-secondary/80"
                 >
                   <Keyboard className="w-5 h-5" />
                 </Button>
@@ -235,26 +234,26 @@ export default function Index() {
 
         {/* Step: Confirm */}
         {step === 'confirm' && (
-          <div className="space-y-5 animate-fade-in">
-            <Card className="p-6 text-center border-2 border-primary bg-primary/5">
-              <p className="text-sm text-muted-foreground mb-2">Código detectado</p>
-              <p className="text-2xl font-mono font-bold text-foreground break-all">
+          <div className="space-y-3 animate-fade-in">
+            <Card className="p-3 text-center border-2 border-primary bg-primary/5">
+              <p className="text-xs text-muted-foreground mb-1">Código detectado</p>
+              <p className="text-xl font-mono font-bold text-foreground break-all">
                 {codigo}
               </p>
             </Card>
 
             <Button
               onClick={handleConfirmArticle}
-              className="w-full h-16 text-xl font-bold bg-success hover:bg-success/90 text-success-foreground"
+              className="w-full h-14 text-lg font-bold bg-success hover:bg-success/90 text-success-foreground"
             >
-              <CheckCircle className="w-6 h-6 mr-3" />
+              <CheckCircle className="w-5 h-5 mr-2" />
               CONFIRMAR ARTÍCULO
             </Button>
 
             <Button
               onClick={resetCapture}
               variant="outline"
-              className="w-full h-12 text-muted-foreground border-muted-foreground/30"
+              className="w-full h-10 text-sm text-muted-foreground border-muted-foreground/30"
             >
               Cancelar
             </Button>
@@ -263,14 +262,14 @@ export default function Index() {
 
         {/* Step: Quantity */}
         {step === 'quantity' && (
-          <div className="space-y-5 animate-fade-in">
-            <Card className="p-4 bg-muted/50">
-              <p className="text-xs text-muted-foreground">Artículo</p>
-              <p className="font-mono font-bold text-lg text-foreground">{codigo}</p>
+          <div className="space-y-2 animate-fade-in">
+            <Card className="p-2.5 bg-muted/50">
+              <p className="text-[10px] text-muted-foreground">Artículo</p>
+              <p className="font-mono font-bold text-base text-foreground">{codigo}</p>
             </Card>
 
-            <div className="space-y-3">
-              <Label htmlFor="cantidad" className="text-lg font-semibold">
+            <div className="space-y-1">
+              <Label htmlFor="cantidad" className="text-sm font-semibold">
                 CANTIDAD
               </Label>
               <Input
@@ -282,7 +281,7 @@ export default function Index() {
                 value={cantidad}
                 onChange={(e) => setCantidad(e.target.value)}
                 placeholder="0"
-                className="h-20 text-4xl font-bold text-center"
+                className="h-14 text-3xl font-bold text-center"
                 onKeyDown={(e) => e.key === 'Enter' && handleSave()}
               />
             </div>
@@ -290,16 +289,16 @@ export default function Index() {
             <Button
               onClick={handleSave}
               disabled={!cantidad || parseInt(cantidad, 10) <= 0}
-              className="w-full h-16 text-xl font-bold bg-success hover:bg-success/90 text-success-foreground"
+              className="w-full h-14 text-lg font-bold bg-success hover:bg-success/90 text-success-foreground"
             >
-              <Save className="w-6 h-6 mr-3" />
+              <Save className="w-5 h-5 mr-2" />
               GUARDAR
             </Button>
 
             <Button
               onClick={resetCapture}
               variant="outline"
-              className="w-full h-12 text-muted-foreground border-muted-foreground/30"
+              className="w-full h-10 text-sm text-muted-foreground border-muted-foreground/30"
             >
               Cancelar
             </Button>
@@ -308,7 +307,7 @@ export default function Index() {
 
         {/* Recent History (only in scan step) */}
         {step === 'scan' && (
-          <div className="mt-8">
+          <div className="mt-4">
             <RecentHistory items={inventory} />
           </div>
         )}
