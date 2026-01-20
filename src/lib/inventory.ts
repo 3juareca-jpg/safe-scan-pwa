@@ -120,15 +120,21 @@ export function saveLocation(location: Location): void {
 // Export to CSV
 export function exportToCSV(): string {
   const items = getInventory();
-  const headers = ['Código', 'Cantidad', 'Pasillo', 'Columna', 'Leja', 'Fecha'];
-  const rows = items.map(item => [
-    item.codigo,
-    item.cantidad.toString(),
-    item.ubicacion.pasillo,
-    item.ubicacion.columna,
-    item.ubicacion.leja,
-    new Date(item.timestamp).toLocaleString('es-ES'),
-  ]);
+  const headers = ['Codigo', 'Cantidad', 'ubicación', 'Fecha'];
+  const rows = items.map(item => {
+    const ubicacionStr = [
+      item.ubicacion.pasillo,
+      item.ubicacion.columna,
+      item.ubicacion.leja
+    ].filter(Boolean).join('-');
+    
+    return [
+      item.codigo,
+      item.cantidad.toString(),
+      ubicacionStr,
+      new Date(item.timestamp).toLocaleString('es-ES'),
+    ];
+  });
   
   const csvContent = [headers, ...rows]
     .map(row => row.map(cell => `"${cell}"`).join(','))
