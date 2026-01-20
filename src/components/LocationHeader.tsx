@@ -22,18 +22,18 @@ export function LocationHeader({ location, onChange }: LocationHeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-primary shadow-lg">
-      <div className="px-safe py-3">
-        <div className="flex items-center gap-2 mb-3">
-          <MapPin className="w-5 h-5 text-primary-foreground" />
-          <span className="text-sm font-semibold text-primary-foreground tracking-wide">
+    <header className="sticky top-0 z-40 bg-primary shadow-md">
+      <div className="px-safe py-2">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <MapPin className="w-4 h-4 text-primary-foreground" />
+          <span className="text-xs font-semibold text-primary-foreground tracking-wide">
             UBICACIÓN ACTUAL
           </span>
         </div>
         
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="pasillo" className="text-xs font-medium text-primary-foreground/80">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-0.5">
+            <Label htmlFor="pasillo" className="text-[10px] font-medium text-primary-foreground/80">
               PASILLO *
             </Label>
             <Input
@@ -41,12 +41,12 @@ export function LocationHeader({ location, onChange }: LocationHeaderProps) {
               value={location.pasillo}
               onChange={(e) => handleChange('pasillo', e.target.value)}
               placeholder="A1"
-              className="h-12 text-center font-bold text-lg bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/40 focus:bg-primary-foreground/20"
+              className="h-9 text-center font-bold text-base bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/40 focus:bg-primary-foreground/20"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="columna" className="text-xs font-medium text-primary-foreground/80">
+          <div className="space-y-0.5">
+            <Label htmlFor="columna" className="text-[10px] font-medium text-primary-foreground/80">
               COLUMNA {!isGeneric && '*'}
             </Label>
             <Input
@@ -55,12 +55,12 @@ export function LocationHeader({ location, onChange }: LocationHeaderProps) {
               onChange={(e) => handleChange('columna', e.target.value)}
               placeholder={isGeneric ? '-' : '01'}
               disabled={isGeneric}
-              className="h-12 text-center font-bold text-lg bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/40 focus:bg-primary-foreground/20 disabled:opacity-40"
+              className="h-9 text-center font-bold text-base bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/40 focus:bg-primary-foreground/20 disabled:opacity-40"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="leja" className="text-xs font-medium text-primary-foreground/80">
+          <div className="space-y-0.5">
+            <Label htmlFor="leja" className="text-[10px] font-medium text-primary-foreground/80">
               LEJA {!isGeneric && '*'}
             </Label>
             <Input
@@ -69,14 +69,14 @@ export function LocationHeader({ location, onChange }: LocationHeaderProps) {
               onChange={(e) => handleChange('leja', e.target.value)}
               placeholder={isGeneric ? '-' : '1'}
               disabled={isGeneric}
-              className="h-12 text-center font-bold text-lg bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/40 focus:bg-primary-foreground/20 disabled:opacity-40"
+              className="h-9 text-center font-bold text-base bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/40 focus:bg-primary-foreground/20 disabled:opacity-40"
             />
           </div>
         </div>
 
         {isGeneric && (
-          <p className="mt-2 text-xs text-primary-foreground/60 text-center">
-            Zona genérica detectada - Columna y Leja opcionales
+          <p className="mt-1 text-[10px] text-primary-foreground/60 text-center">
+            Zona genérica - Columna y Leja opcionales
           </p>
         )}
       </div>
