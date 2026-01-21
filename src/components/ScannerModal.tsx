@@ -26,6 +26,15 @@ const SUPPORTED_FORMATS = [
   Html5QrcodeSupportedFormats.PDF_417,
 ];
 
+// Extended type for camera capabilities
+interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+  focusMode?: string[];
+  focusDistance?: { min: number; max: number };
+  exposureMode?: string[];
+  whiteBalanceMode?: string[];
+}
+
 export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
@@ -33,6 +42,7 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
   const [torchAvailable, setTorchAvailable] = useState(false);
   const [scanAttempts, setScanAttempts] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
@@ -48,13 +58,14 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
     trackRef.current = null;
     setTorchOn(false);
     setTorchAvailable(false);
+    setIsFocused(false);
   }, []);
 
   const toggleTorch = useCallback(async () => {
     if (!trackRef.current) return;
     
     try {
-      const capabilities = trackRef.current.getCapabilities() as MediaTrackCapabilities & { torch?: boolean };
+      const capabilities = trackRef.current.getCapabilities() as ExtendedMediaTrackCapabilities;
       if (capabilities.torch) {
         const newTorchState = !torchOn;
         await trackRef.current.applyConstraints({
@@ -67,6 +78,47 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
     }
   }, [torchOn]);
 
+  // Apply advanced camera constraints for optimal barcode scanning
+  const applyAdvancedCameraConstraints = useCallback(async (videoTrack: MediaStreamTrack) => {
+    try {
+      const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
+      const constraints: MediaTrackConstraints & { focusMode?: string; focusDistance?: number; exposureMode?: string } = {};
+      
+      // Configure continuous focus mode for stable scanning
+      if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+        constraints.focusMode = 'continuous';
+        console.log('✓ Enfoque continuo activado');
+      }
+      
+      // Set optimal focus distance for barcodes (30-50cm range)
+      if (capabilities.focusDistance) {
+        // Calculate optimal distance (0.3-0.5 meters mapped to capability range)
+        const { min, max } = capabilities.focusDistance;
+        const optimalDistance = Math.min(Math.max(0.4, min), max); // ~40cm
+        constraints.focusDistance = optimalDistance;
+        console.log(`✓ Distancia de enfoque: ${optimalDistance}m`);
+      }
+      
+      // Optimize exposure for white labels with barcodes
+      if (capabilities.exposureMode && capabilities.exposureMode.includes('continuous')) {
+        constraints.exposureMode = 'continuous';
+        console.log('✓ Exposición continua activada');
+      }
+      
+      // Apply constraints if any were set
+      if (Object.keys(constraints).length > 0) {
+        await videoTrack.applyConstraints(constraints as MediaTrackConstraints);
+        console.log('✓ Configuración de cámara optimizada aplicada');
+      }
+      
+      // Check torch availability
+      setTorchAvailable(!!capabilities.torch);
+      
+    } catch (err) {
+      console.warn('No se pudieron aplicar todas las constraints:', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -75,6 +127,7 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
       setError(null);
       setScanAttempts(0);
       setIsScanning(false);
+      setIsFocused(false);
 
       try {
         const scanner = new Html5Qrcode('scanner-container', {
@@ -87,7 +140,7 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
           { facingMode: 'environment' },
           {
             fps: 30,
-            qrbox: { width: 300, height: 120 },
+            qrbox: { width: 320, height: 100 }, // Optimized for horizontal barcodes
             aspectRatio: 1.777,
             disableFlip: false,
           },
@@ -103,15 +156,22 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
           }
         );
 
-        // Get the video track for torch control
+        // Get the video track for torch and focus control
         const videoElement = document.querySelector('#scanner-container video') as HTMLVideoElement;
         if (videoElement && videoElement.srcObject) {
           const stream = videoElement.srcObject as MediaStream;
           const tracks = stream.getVideoTracks();
           if (tracks.length > 0) {
-            trackRef.current = tracks[0];
-            const capabilities = tracks[0].getCapabilities() as MediaTrackCapabilities & { torch?: boolean };
-            setTorchAvailable(!!capabilities.torch);
+            const videoTrack = tracks[0];
+            trackRef.current = videoTrack;
+            
+            // Apply advanced camera constraints for optimal barcode scanning
+            await applyAdvancedCameraConstraints(videoTrack);
+            
+            // Set focused state after camera stabilizes (1.5s)
+            setTimeout(() => {
+              setIsFocused(true);
+            }, 1500);
           }
         }
       } catch (err) {
@@ -127,7 +187,7 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
     return () => {
       stopScanner();
     };
-  }, [isOpen, onScan, onClose, stopScanner]);
+  }, [isOpen, onScan, onClose, stopScanner, applyAdvancedCameraConstraints]);
 
   const handleClose = async () => {
     await stopScanner();
@@ -161,18 +221,36 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
             ref={containerRef}
             id="scanner-container"
             className={`w-full aspect-video rounded-xl overflow-hidden bg-foreground/50 ${
-              isScanning ? 'ring-2 ring-accent animate-pulse' : ''
+              isScanning && isFocused ? 'ring-4 ring-green-500' : 'ring-2 ring-white/30'
             }`}
           />
           
-          {/* Scanning animation overlay */}
-          {isScanning && !isStarting && (
-            <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent animate-[scan_2s_ease-in-out_infinite]" 
-                   style={{ 
-                     animation: 'scan 2s ease-in-out infinite',
-                   }} 
-              />
+          {/* Barcode alignment frame overlay */}
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+            <div className="relative" style={{ width: '320px', height: '100px' }}>
+              {/* Corner decorations for barcode alignment */}
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-accent rounded-tl-lg" />
+              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-accent rounded-tr-lg" />
+              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-accent rounded-bl-lg" />
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-accent rounded-br-lg" />
+              
+              {/* Scanning line animation */}
+              {isScanning && !isStarting && (
+                <div 
+                  className="absolute left-2 right-2 h-0.5 bg-accent"
+                  style={{ 
+                    animation: 'scanLine 1.5s ease-in-out infinite',
+                  }} 
+                />
+              )}
+            </div>
+          </div>
+          
+          {/* Focus ready indicator */}
+          {isFocused && !isStarting && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-green-500/90 text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2">
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+              Cámara lista
             </div>
           )}
           
@@ -195,6 +273,13 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
               )}
             </Button>
           )}
+          
+          {/* Distance guide */}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-center">
+            <p className="text-white text-xs bg-black/70 px-3 py-1.5 rounded-full backdrop-blur-sm">
+              📏 Mantén el código a 30-50cm
+            </p>
+          </div>
           
           {/* Scan attempts counter */}
           {scanAttempts > 0 && !isStarting && (
@@ -220,7 +305,10 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
         )}
         {!isStarting && !error && (
           <p className="text-muted-foreground">
-            Centra el código de barras en el recuadro
+            {isFocused 
+              ? 'Centra el código de barras en el marco verde'
+              : 'Estabilizando enfoque...'
+            }
           </p>
         )}
       </div>
@@ -238,9 +326,15 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
       
       {/* Scanning line animation styles */}
       <style>{`
-        @keyframes scan {
-          0%, 100% { transform: translateY(0); opacity: 0.8; }
-          50% { transform: translateY(calc(100% * 1.777 / 2)); opacity: 1; }
+        @keyframes scanLine {
+          0%, 100% { 
+            top: 0; 
+            opacity: 0.8; 
+          }
+          50% { 
+            top: calc(100% - 2px); 
+            opacity: 1; 
+          }
         }
       `}</style>
     </div>
