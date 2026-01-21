@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { X, Camera, AlertCircle } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { X, Camera, AlertCircle, Flashlight, FlashlightOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ScannerModalProps {
@@ -9,11 +9,63 @@ interface ScannerModalProps {
   onScan: (code: string) => void;
 }
 
+// All supported barcode formats
+const SUPPORTED_FORMATS = [
+  Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+  Html5QrcodeSupportedFormats.CODE_93,
+  Html5QrcodeSupportedFormats.CODABAR,
+  Html5QrcodeSupportedFormats.ITF,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.DATA_MATRIX,
+  Html5QrcodeSupportedFormats.AZTEC,
+  Html5QrcodeSupportedFormats.PDF_417,
+];
+
 export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchAvailable, setTorchAvailable] = useState(false);
+  const [scanAttempts, setScanAttempts] = useState(0);
+  const [isScanning, setIsScanning] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<MediaStreamTrack | null>(null);
+
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current?.isScanning) {
+      try {
+        await scannerRef.current.stop();
+      } catch {
+        // Ignore stop errors
+      }
+    }
+    trackRef.current = null;
+    setTorchOn(false);
+    setTorchAvailable(false);
+  }, []);
+
+  const toggleTorch = useCallback(async () => {
+    if (!trackRef.current) return;
+    
+    try {
+      const capabilities = trackRef.current.getCapabilities() as MediaTrackCapabilities & { torch?: boolean };
+      if (capabilities.torch) {
+        const newTorchState = !torchOn;
+        await trackRef.current.applyConstraints({
+          advanced: [{ torch: newTorchState } as MediaTrackConstraintSet]
+        });
+        setTorchOn(newTorchState);
+      }
+    } catch (err) {
+      console.error('Error toggling torch:', err);
+    }
+  }, [torchOn]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -21,17 +73,23 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
     const startScanner = async () => {
       setIsStarting(true);
       setError(null);
+      setScanAttempts(0);
+      setIsScanning(false);
 
       try {
-        const scanner = new Html5Qrcode('scanner-container');
+        const scanner = new Html5Qrcode('scanner-container', {
+          formatsToSupport: SUPPORTED_FORMATS,
+          verbose: false,
+        });
         scannerRef.current = scanner;
 
         await scanner.start(
           { facingMode: 'environment' },
           {
-            fps: 10,
-            qrbox: { width: 280, height: 160 },
+            fps: 30,
+            qrbox: { width: 300, height: 120 },
             aspectRatio: 1.777,
+            disableFlip: false,
           },
           (decodedText) => {
             onScan(decodedText);
@@ -39,9 +97,23 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
             onClose();
           },
           () => {
-            // Ignore scan failures
+            // Count scan attempts for feedback
+            setScanAttempts(prev => prev + 1);
+            setIsScanning(true);
           }
         );
+
+        // Get the video track for torch control
+        const videoElement = document.querySelector('#scanner-container video') as HTMLVideoElement;
+        if (videoElement && videoElement.srcObject) {
+          const stream = videoElement.srcObject as MediaStream;
+          const tracks = stream.getVideoTracks();
+          if (tracks.length > 0) {
+            trackRef.current = tracks[0];
+            const capabilities = tracks[0].getCapabilities() as MediaTrackCapabilities & { torch?: boolean };
+            setTorchAvailable(!!capabilities.torch);
+          }
+        }
       } catch (err) {
         console.error('Scanner error:', err);
         setError('No se pudo acceder a la cámara. Verifica los permisos.');
@@ -50,31 +122,15 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
       }
     };
 
-    const stopScanner = async () => {
-      if (scannerRef.current?.isScanning) {
-        try {
-          await scannerRef.current.stop();
-        } catch {
-          // Ignore stop errors
-        }
-      }
-    };
-
     startScanner();
 
     return () => {
       stopScanner();
     };
-  }, [isOpen, onScan, onClose]);
+  }, [isOpen, onScan, onClose, stopScanner]);
 
   const handleClose = async () => {
-    if (scannerRef.current?.isScanning) {
-      try {
-        await scannerRef.current.stop();
-      } catch {
-        // Ignore
-      }
-    }
+    await stopScanner();
     onClose();
   };
 
@@ -99,19 +155,61 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
       </div>
 
       {/* Scanner viewport */}
-      <div className="flex-1 flex items-center justify-center px-safe">
-        <div
-          ref={containerRef}
-          id="scanner-container"
-          className="w-full max-w-md aspect-video rounded-xl overflow-hidden bg-foreground/50"
-        />
+      <div className="flex-1 flex items-center justify-center px-safe relative">
+        <div className="relative w-full max-w-md">
+          <div
+            ref={containerRef}
+            id="scanner-container"
+            className={`w-full aspect-video rounded-xl overflow-hidden bg-foreground/50 ${
+              isScanning ? 'ring-2 ring-accent animate-pulse' : ''
+            }`}
+          />
+          
+          {/* Scanning animation overlay */}
+          {isScanning && !isStarting && (
+            <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent animate-[scan_2s_ease-in-out_infinite]" 
+                   style={{ 
+                     animation: 'scan 2s ease-in-out infinite',
+                   }} 
+              />
+            </div>
+          )}
+          
+          {/* Torch button */}
+          {torchAvailable && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTorch}
+              className={`absolute top-3 right-3 rounded-full w-12 h-12 ${
+                torchOn 
+                  ? 'bg-accent text-accent-foreground' 
+                  : 'bg-background/60 text-foreground backdrop-blur-sm'
+              }`}
+            >
+              {torchOn ? (
+                <FlashlightOff className="w-6 h-6" />
+              ) : (
+                <Flashlight className="w-6 h-6" />
+              )}
+            </Button>
+          )}
+          
+          {/* Scan attempts counter */}
+          {scanAttempts > 0 && !isStarting && (
+            <div className="absolute bottom-3 left-3 bg-background/60 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-foreground">
+              Intentos: {scanAttempts}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Status */}
       <div className="px-safe py-6 text-center">
         {isStarting && (
           <p className="text-muted-foreground animate-pulse">
-            Iniciando cámara...
+            Iniciando cámara HD...
           </p>
         )}
         {error && (
@@ -137,6 +235,14 @@ export function ScannerModal({ isOpen, onClose, onScan }: ScannerModalProps) {
           Cancelar
         </Button>
       </div>
+      
+      {/* Scanning line animation styles */}
+      <style>{`
+        @keyframes scan {
+          0%, 100% { transform: translateY(0); opacity: 0.8; }
+          50% { transform: translateY(calc(100% * 1.777 / 2)); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }
